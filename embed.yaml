@@ -1,0 +1,18 @@
+name: embedtextserver
+services:
+    vllm-openai:
+        runtime: nvidia
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          device_ids: ['0']
+                          capabilities: [gpu]
+        volumes:
+            - /home/ubuntu/mnt/qylis/my_hf_cache:/root/.cache/huggingface
+        ports:
+            - 7000:8000
+        ipc: host
+        image: vllm/vllm-openai:latest
+        command: --model BAAI/bge-m3 --task embed --tensor-parallel-size 1

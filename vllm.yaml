@@ -1,0 +1,20 @@
+name: llmserver
+services:
+    vllm-openai:
+        runtime: nvidia
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          device_ids: ['2', '3']
+                          capabilities: [gpu]
+        volumes:
+            - /home/ubuntu/mnt/aidata/my_hf_cache:/root/.cache/huggingface
+        environment:
+            - HUGGING_FACE_HUB_TOKEN=<token>
+        ports:
+            - 8000:8000
+        ipc: host
+        image: vllm/vllm-openai:latest
+        command: --model meta-llama/Llama-3.1-8B-Instruct --enable-auto-tool-choice --tool-call-parser llama3_json --chat-template examples/tool_chat_template_llama3.1_json.jinja --tensor-parallel-size 2
