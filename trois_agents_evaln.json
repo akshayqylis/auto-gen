@@ -1,0 +1,212 @@
+{
+  "provider": "autogen_agentchat.teams.RoundRobinGroupChat",
+  "component_type": "team",
+  "version": 1,
+  "component_version": 1,
+  "description": "Two agents each with a calculator and search knowledge base tool respectively along with a user proxy agent in a RoundRobinGroupChat team. ",
+  "label": "default_team17",
+  "config": {
+    "participants": [
+      {
+        "provider": "autogen_agentchat.agents.UserProxyAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that can represent a human user through an input function.",
+        "label": "UserProxyAgent",
+        "config": {
+          "name": "user_proxy",
+          "description": "a human user that should be consulted only when the assistant_agent is unable to verify the information provided by the websurfer_agent"
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.AssistantAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "AI assistant with access to indexed PDF knowledge base",
+        "label": "2.0 QRAG",
+        "config": {
+          "name": "_2_0_Agentic_QRAG",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Chat completion client for OpenAI hosted models.",
+            "label": "OpenAIChatCompletionClient",
+            "config": {
+              "model": "meta-llama/Llama-3.1-8B-Instruct",
+              "api_key": "empty",
+              "model_info": {
+                "vision": false,
+                "function_calling": true,
+                "json_output": false,
+                "family": "llama"
+              },
+              "base_url": "http://g3.ai.qylis.com:8000/v1"
+            }
+          },
+          "tools": [
+            {
+              "provider": "autogen_core.tools.FunctionTool",
+              "component_type": "tool",
+              "version": 1,
+              "component_version": 1,
+              "description": "Search indexed PDF documents for relevant information",
+              "label": "Search Knowledge Base",
+              "config": {
+                "source_code": "def search_knowledge_base(query: str, max_results: int = 3, relevance_threshold: float = 0.3) -> str:\n    \"\"\"\n    Search the indexed PDF knowledge base for relevant information.\n    \n    This tool searches through indexed PDF documents to find relevant context\n    for answering user questions. If no relevant information is found above\n    the threshold, it returns a message indicating general knowledge should be used.\n    \n    Args:\n        query (str): The search query or question to find relevant information for\n        max_results (int): Maximum number of relevant chunks to return (default: 3)\n        relevance_threshold (float): Minimum similarity score for relevance (default: 0.3)\n    \n    Returns:\n        str: Either relevant context from indexed documents or indication to use general knowledge\n    \"\"\"\n    \n    try:\n        # Configuration - use absolute path to ensure it works from any directory\n        import os\n        # Get the directory where your indexing script is located\n        BASE_DIR = os.path.expanduser(\"~/qylis-wsl/autogen/hakaautogen\")  # Update this to your actual path\n        VECTOR_STORE_PATH = os.path.join(BASE_DIR, \"vector_store\", \"pdf_store.pkl\")\n        MODEL_NAME = 'BAAI/bge-base-en-v1.5'\n        \n        # Check if vector store exists\n        if not os.path.exists(VECTOR_STORE_PATH):\n            return \"Knowledge base not found. Please ensure the PDF indexing has been completed first. I'll answer using my general knowledge.\"\n        \n        # Initialize components\n        model = SentenceTransformer(MODEL_NAME)\n        client = QdrantClient(\":memory:\")\n        collection_name = \"pdf_documents\"\n        \n        # Load the saved vector store\n        try:\n            with open(VECTOR_STORE_PATH, 'rb') as f:\n                store_data = pickle.load(f)\n            \n            # Debug: Check what was loaded\n            if store_data is None:\n                return \"Knowledge base file exists but contains no data. Please re-run the indexing script.\"\n            \n            if not isinstance(store_data, dict):\n                return f\"Knowledge base file format is incorrect. Expected dict, got {type(store_data)}. Please re-run the indexing script.\"\n            \n            points = store_data.get(\"points\", [])\n            if not points:\n                return f\"Knowledge base contains no indexed points. Available keys: {list(store_data.keys())}. Please re-run the indexing script.\"\n            \n            # Recreate collection\n            sample_embedding = model.encode(\"sample text\")\n            vector_size = len(sample_embedding)\n            \n            client.create_collection(\n                collection_name=collection_name,\n                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)\n            )\n            \n            # Convert serialized points back to PointStruct for uploading\n            upload_points = []\n            for point_data in points:\n                try:\n                    # Handle the new serializable format\n                    if isinstance(point_data, dict):\n                        upload_point = PointStruct(\n                            id=point_data.get(\"id\"),\n                            vector=point_data.get(\"vector\"),\n                            payload=point_data.get(\"payload\", {})\n                        )\n                        upload_points.append(upload_point)\n                    # Handle old Record objects (fallback)\n                    elif hasattr(point_data, 'id') and hasattr(point_data, 'vector') and hasattr(point_data, 'payload'):\n                        upload_point = PointStruct(\n                            id=point_data.id,\n                            vector=point_data.vector if isinstance(point_data.vector, list) else point_data.vector.tolist(),\n                            payload=point_data.payload\n                        )\n                        upload_points.append(upload_point)\n                except Exception as e:\n                    print(f\"Error processing point: {e}\")\n                    continue\n            \n            if not upload_points:\n                return \"No valid points found in the knowledge base. Please re-run the indexing script.\"\n            \n            # Load points into collection\n            client.upsert(\n                collection_name=collection_name,\n                points=upload_points\n            )\n            \n        except Exception as e:\n            return f\"Error loading knowledge base: {str(e)}. I'll answer using my general knowledge.\"\n        \n        # Search for relevant information\n        try:\n            query_embedding = model.encode(query).tolist()\n            \n            search_results = client.search(\n                collection_name=collection_name,\n                query_vector=query_embedding,\n                limit=max_results * 2  # Get more results to filter by threshold\n            )\n            \n            # Filter results by relevance threshold\n            relevant_results = []\n            for result in search_results:\n                if result.score >= relevance_threshold:\n                    relevant_results.append({\n                        \"text\": result.payload[\"text\"],\n                        \"score\": result.score,\n                        \"source_file\": result.payload[\"source_file\"],\n                        \"chunk_index\": result.payload[\"chunk_index\"]\n                    })\n            \n            # Limit to max_results\n            relevant_results = relevant_results[:max_results]\n            \n            if not relevant_results:\n                return f\"No relevant information found in the knowledge base for this query (searched {len(search_results)} chunks, none above threshold {relevance_threshold}). I'll answer using my general knowledge.\"\n            \n            # Format the response with relevant context\n            context_parts = []\n            context_parts.append(f\"Found {len(relevant_results)} relevant chunks from the knowledge base:\")\n            context_parts.append(\"\")\n            \n            for i, result in enumerate(relevant_results, 1):\n                context_parts.append(f\"**Source {i}** (from {result['source_file']}, relevance: {result['score']:.3f}):\")\n                context_parts.append(result['text'])\n                context_parts.append(\"\")\n            \n            context_parts.append(\"---\")\n            context_parts.append(\"Please use the above context from the indexed documents to answer the user's question. If the context doesn't fully address the question, you can supplement with your general knowledge but prioritize the indexed information.\")\n            \n            return \"\\n\".join(context_parts)\n            \n        except Exception as e:\n            return f\"Error during search: {str(e)}. I'll answer using my general knowledge.\"\n            \n    except Exception as e:\n        return f\"Unexpected error in knowledge base search: {str(e)}. I'll answer using my general knowledge.\"",
+                "name": "search_knowledge_base",
+                "description": "A simple calculator that performs basic arithmetic operations",
+                "global_imports": [
+                  "os",
+                  "pickle",
+                  {
+                    "module": "typing",
+                    "imports": [
+                      "List",
+                      "Dict",
+                      "Any",
+                      "Optional"
+                    ]
+                  },
+                  {
+                    "module": "sentence_transformers",
+                    "imports": [
+                      "SentenceTransformer"
+                    ]
+                  },
+                  {
+                    "module": "qdrant_client",
+                    "imports": [
+                      "QdrantClient"
+                    ]
+                  },
+                  {
+                    "module": "qdrant_client.models",
+                    "imports": [
+                      "Distance",
+                      "VectorParams",
+                      "PointStruct"
+                    ]
+                  }
+                ],
+                "has_cancellation_support": false
+              }
+            }
+          ],
+          "model_context": {
+            "provider": "autogen_core.model_context.UnboundedChatCompletionContext",
+            "component_type": "chat_completion_context",
+            "version": 1,
+            "component_version": 1,
+            "description": "An unbounded chat completion context that keeps a view of the all the messages.",
+            "label": "UnboundedChatCompletionContext",
+            "config": {}
+          },
+          "description": "An agent that provides assistance with ability to use tools.",
+          "system_message": "You are an intelligent assistant with access to a knowledge base of indexed PDF documents.\n\nWhen users ask questions:\n1. ALWAYS first use the search_knowledge_base tool to find relevant information\n2. If relevant context is found, base your answer primarily on that information\n3. If no relevant context is found, answer using your general knowledge\n4. Always indicate whether your response is based on the indexed documents or general knowledge\n5. Be concise but thorough in your responses\n\nFocus on being helpful and accurate.",
+          "model_client_stream": false,
+          "reflect_on_tool_use": true,
+          "tool_call_summary_format": "{result}"
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.AssistantAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that provides assistance with simple arithmetic using a calculator tool.",
+        "label": "CalculatorAgent",
+        "config": {
+          "name": "assistant_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Chat completion client for OpenAI hosted models.",
+            "label": "OpenAIChatCompletionClient",
+            "config": {
+              "model": "meta-llama/Llama-3.1-8B-Instruct",
+              "api_key": "empty",
+              "model_info": {
+                "vision": false,
+                "function_calling": true,
+                "json_output": false,
+                "family": "llama"
+              },
+              "base_url": "http://g3.ai.qylis.com:8000/v1"
+            }
+          },
+          "tools": [
+            {
+              "provider": "autogen_core.tools.FunctionTool",
+              "component_type": "tool",
+              "version": 1,
+              "component_version": 1,
+              "description": "Create custom tools by wrapping standard Python functions.",
+              "label": "FunctionTool",
+              "config": {
+                "source_code": "def calculator(a: float, b: float, operator: str) -> str:\n    try:\n        if operator == \"+\":\n            return str(a + b)\n        elif operator == \"-\":\n            return str(a - b)\n        elif operator == \"*\":\n            return str(a * b)\n        elif operator == \"/\":\n            if b == 0:\n                return \"Error: Division by zero\"\n            return str(a / b)\n        else:\n            return \"Error: Invalid operator. Please use +, -, *, or /\"\n    except Exception as e:\n        return f\"Error: {str(e)}\"\n",
+                "name": "calculator",
+                "description": "A simple calculator that performs basic arithmetic operations",
+                "global_imports": [],
+                "has_cancellation_support": false
+              }
+            }
+          ],
+          "model_context": {
+            "provider": "autogen_core.model_context.UnboundedChatCompletionContext",
+            "component_type": "chat_completion_context",
+            "version": 1,
+            "component_version": 1,
+            "description": "An unbounded chat completion context that keeps a view of the all the messages.",
+            "label": "UnboundedChatCompletionContext",
+            "config": {}
+          },
+          "description": "An agent that provides assistance with ability to use tools.",
+          "system_message": "You are a helpful assistant. Solve tasks carefully. When done, say TERMINATE.",
+          "model_client_stream": false,
+          "reflect_on_tool_use": true,
+          "tool_call_summary_format": "{result}"
+        }
+      }
+    ],
+    "termination_condition": {
+      "provider": "autogen_agentchat.base.OrTerminationCondition",
+      "component_type": "termination",
+      "version": 1,
+      "component_version": 1,
+      "label": "OrTerminationCondition",
+      "config": {
+        "conditions": [
+          {
+            "provider": "autogen_agentchat.conditions.TextMentionTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation if a specific text is mentioned.",
+            "label": "TextMentionTermination",
+            "config": {
+              "text": "TERMINATE"
+            }
+          },
+          {
+            "provider": "autogen_agentchat.conditions.MaxMessageTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation after a maximum number of messages have been exchanged.",
+            "label": "MaxMessageTermination",
+            "config": {
+              "max_messages": 10,
+              "include_agent_event": false
+            }
+          }
+        ]
+      }
+    }
+  }
+}
