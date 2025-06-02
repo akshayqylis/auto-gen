@@ -1,0 +1,4 @@
+Start a conversation with the user in the loop
+What is the agentic solution about?
+Calculate the time reduction due to it
+What is the percentage reduction?
