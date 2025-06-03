@@ -24,7 +24,7 @@
             "description": "Chat completion client for OpenAI hosted models.",
             "label": "OpenAIChatCompletionClient",
             "config": {
-              "model": "meta-llama/Llama-3.1-8B-Instruct",
+              "model": "Team-ACE/ToolACE-2-Llama-3.1-8B",
               "api_key": "empty",
               "model_info": {
                 "vision": false,
@@ -32,7 +32,7 @@
                 "json_output": true,
                 "family": "llama"
               },
-              "base_url": "http://g3.ai.qylis.com:8000/v1"
+              "base_url": "https://g3.ai.qylis.com/tllama3/v1"
             }
           },
           "tools": [
@@ -62,7 +62,7 @@
             "config": {}
           },
           "description": "An agent that provides assistance with ability to use tools.",
-          "system_message": "You are a helpful assistant. Solve tasks carefully.",
+          "system_message": "You are a helpful assistant equipped with a calculator tool. Use the calculator tool only for solving arithmetic problems involving basic operations: addition (+), subtraction (−), multiplication (×), and division (÷). Follow these guidelines: 1. Use the calculator for any numeric expression that includes arithmetic operations, even simple ones. 2. Send only the numeric expression to the calculator tool—do not include units, words, or extra characters. 3. When responding, clearly explain what you're calculating if helpful, and return the result accurately. Do not estimate—always use the calculator tool for math.",
           "model_client_stream": false,
           "reflect_on_tool_use": true,
           "tool_call_summary_format": "{result}"
@@ -85,7 +85,7 @@
             "description": "Chat completion client for OpenAI hosted models.",
             "label": "OpenAIChatCompletionClient",
             "config": {
-              "model": "meta-llama/Llama-3.1-8B-Instruct",
+              "model": "Team-ACE/ToolACE-2-Llama-3.1-8B",
               "api_key": "empty",
               "model_info": {
                 "vision": false,
@@ -93,7 +93,7 @@
                 "json_output": true,
                 "family": "llama"
               },
-              "base_url": "http://g3.ai.qylis.com:8000/v1"
+              "base_url": "https://g3.ai.qylis.com/tllama3/v1"
             }
           },
           "tools": [
@@ -172,6 +172,43 @@
           "name": "user_proxy",
           "description": "a human user that should be contacted when the other agents finish their tasks"
         }
+      },
+      {
+        "provider": "autogen_ext.agents.web_surfer.MultimodalWebSurfer",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that solves tasks by browsing the web using a headless browser.",
+        "label": "Web Surfer Agent",
+        "config": {
+          "name": "websurfer_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Chat completion client for OpenAI hosted models.",
+            "label": "OpenAIChatCompletionClient",
+            "config": {
+              "model": "Team-ACE/ToolACE-2-Llama-3.1-8B",
+              "api_key": "EMPTY",
+              "base_url": "https://g3.ai.qylis.com/tllama3/v1",
+              "model_info": {
+                "vision": false,
+                "function_calling": true,
+                "json_output": true,
+                "family": "llama"
+              }
+            }
+          },
+          "description": "an agent that solves tasks by browsing the web",
+          "headless": true,
+          "start_page": "https://www.bing.com/",
+          "animate_actions": false,
+          "to_save_screenshots": false,
+          "use_ocr": false,
+          "to_resize_viewport": true
+        }
       }
     ],
     "model_client": {
@@ -190,7 +227,7 @@
           "json_output": true,
           "family": "llama"
         },
-        "base_url": "http://g3.ai.qylis.com:8000/v1"
+        "base_url": "https://g3.ai.qylis.com/llama3/v1"
       }
     },
     "termination_condition": {
@@ -229,6 +266,6 @@
     },
     "selector_prompt": "You are in a role play game. The following roles are available:\n{roles}.\nRead the following conversation. Then select the next role from {participants} to play. Only return the role.\n\n{history}\n\nRead the above conversation. Then select the next role from {participants} to play. Only return the role.\n",
     "allow_repeated_speaker": false,
-    "max_selector_attempts": 3
+    "max_selector_attempts": 10
   }
 }
