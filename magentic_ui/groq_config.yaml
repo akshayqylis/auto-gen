@@ -1,0 +1,28 @@
+# config.yaml
+
+######################################
+# Default OpenAI model configuration #
+######################################
+model_config: &client
+  provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+  config:
+    model: llama-3.1-8b-instant
+    api_key: <key>
+    model_info:
+      vision: false
+      function_calling: true
+      json_output: true
+      family: llama
+      structured_output: true
+    base_url: https://api.groq.com/openai/v1
+
+
+
+##########################
+# Clients for each agent #
+##########################
+orchestrator_client: *client
+coder_client: *client
+web_surfer_client: *client
+file_surfer_client: *client
+action_guard_client: *client
