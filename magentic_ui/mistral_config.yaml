@@ -1,0 +1,28 @@
+# config.yaml
+
+######################################
+# Default OpenAI model configuration #
+######################################
+model_config: &client
+  provider: autogen_ext.models.openai.OpenAIChatCompletionClient
+  config:
+    model: mistralai/Mistral-Small-3.1-24B-Instruct-2503
+    api_key: empty
+    model_info:
+      vision: true
+      function_calling: true
+      json_output: true
+      family: unknown
+      structured_output: true
+    base_url: https://g3.ai.qylis.com/mistral/v1
+
+
+
+##########################
+# Clients for each agent #
+##########################
+orchestrator_client: *client
+coder_client: *client
+web_surfer_client: *client
+file_surfer_client: *client
+action_guard_client: *client
