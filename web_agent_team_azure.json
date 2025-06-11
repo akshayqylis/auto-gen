@@ -1,0 +1,150 @@
+{
+  "provider": "autogen_agentchat.teams.SelectorGroupChat",
+  "component_type": "team",
+  "version": 1,
+  "component_version": 1,
+  "description": "A team with 3 agents - a Web Surfer agent that can browse the web, a Verification Assistant that verifies and summarizes information, and a User Proxy that provides human feedback when needed.",
+  "label": "Web Agent Team Azure",
+  "config": {
+    "participants": [
+      {
+        "provider": "autogen_ext.agents.web_surfer.MultimodalWebSurfer",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "MultimodalWebSurfer is a multimodal agent that acts as a web surfer that can search the web and visit web pages.",
+        "label": "MultimodalWebSurfer",
+        "config": {
+          "name": "websurfer_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.AzureOpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "GPT-4o Azure OpenAI model client.",
+            "label": "AzureOpenAI GPT-4o",
+            "config": {
+              "model": "gpt-4o",
+              "api_key": "<key>",
+              "azure_endpoint": "https://evaln-openai.openai.azure.com/",
+              "azure_deployment": "gpt-4o",
+              "api_version": "2024-05-01-preview"
+            }
+          },
+          "description": "an agent that solves tasks by browsing the web",
+          "headless": true,
+          "start_page": "https://www.bing.com/",
+          "animate_actions": true,
+          "to_save_screenshots": false,
+          "use_ocr": false,
+          "to_resize_viewport": true
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.AssistantAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that provides assistance with tool use.",
+        "label": "AssistantAgent",
+        "config": {
+          "name": "assistant_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.AzureOpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "GPT-4o Azure OpenAI model client.",
+            "label": "AzureOpenAI GPT-4o",
+            "config": {
+              "model": "gpt-4o",
+              "api_key": "<key>",
+              "azure_endpoint": "https://evaln-openai.openai.azure.com/",
+              "azure_deployment": "gpt-4o",
+              "api_version": "2024-05-01-preview"
+            }
+          },
+          "tools": [],
+          "model_context": {
+            "provider": "autogen_core.model_context.UnboundedChatCompletionContext",
+            "component_type": "chat_completion_context",
+            "version": 1,
+            "component_version": 1,
+            "description": "An unbounded chat completion context that keeps a view of the all the messages.",
+            "label": "UnboundedChatCompletionContext",
+            "config": {}
+          },
+          "description": "an agent that verifies and summarizes information",
+          "system_message": "You are a task verification assistant who is working with a web surfer agent to solve tasks. At each point, check if the task has been completed as requested by the user. If the websurfer_agent responds and the task has not yet been completed, respond with what is left to do and then say 'keep going'. If and only when the task has been completed, summarize and present a final answer that directly addresses the user task in detail and then respond with TERMINATE.",
+          "model_client_stream": false,
+          "reflect_on_tool_use": false,
+          "tool_call_summary_format": "{result}"
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.UserProxyAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that can represent a human user through an input function.",
+        "label": "UserProxyAgent",
+        "config": {
+          "name": "user_proxy",
+          "description": "a human user that should be consulted only when the assistant_agent is unable to verify the information provided by the websurfer_agent"
+        }
+      }
+    ],
+    "model_client": {
+      "provider": "autogen_ext.models.openai.AzureOpenAIChatCompletionClient",
+      "component_type": "model",
+      "version": 1,
+      "component_version": 1,
+      "description": "GPT-4o Azure OpenAI model client.",
+      "label": "AzureOpenAI GPT-4o",
+      "config": {
+        "model": "gpt-4o",
+        "api_key": "<key>",
+        "azure_endpoint": "https://evaln-openai.openai.azure.com/",
+        "azure_deployment": "gpt-4o",
+        "api_version": "2024-05-01-preview"
+      }
+    },
+    "termination_condition": {
+      "provider": "autogen_agentchat.base.OrTerminationCondition",
+      "component_type": "termination",
+      "version": 1,
+      "component_version": 1,
+      "label": "OrTerminationCondition",
+      "config": {
+        "conditions": [
+          {
+            "provider": "autogen_agentchat.conditions.MaxMessageTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation after a maximum number of messages have been exchanged.",
+            "label": "MaxMessageTermination",
+            "config": {
+              "max_messages": 100,
+              "include_agent_event": false
+            }
+          },
+          {
+            "provider": "autogen_agentchat.conditions.TextMentionTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation if a specific text is mentioned.",
+            "label": "TextMentionTermination",
+            "config": {
+              "text": "TERMINATE"
+            }
+          }
+        ]
+      }
+    },
+    "selector_prompt": "You are the coordinator of a role-playing game. The following roles are available:\n{roles}.\n\nGiven a task, the assistant_agent will create a clear, structured plan in the form of an enumerated list, breaking down the necessary steps to complete the task. Each step will be numbered sequentially and will represent a specific action or task for the websurfer_agent to follow. This plan will guide the websurfer_agent in its search and research process, ensuring all sources are reviewed and information gathered efficiently.\n\nThe assistant_agent will then direct the websurfer_agent to perform each step in the numbered list order. Once all steps are completed, the assistant_agent will verify and summarize the findings, ensuring the final response is accurate, clear, and comprehensive.\n\nThe websurfer_agent must actively browse the web, review all suggested websites, and gather the required information. The websurfer_agent will follow each numbered step, one by one, and will not return until all necessary actions are completed. If multiple sources or links are mentioned, they must be reviewed in the order in which they are presented in the list.\n\nIf the task requires feedback from the user (e.g., preferences or clarifications), the user_proxy role will be used to gather the needed information from the user.\n\nRead the following conversation. Then select the next role from {participants} to play. Only return the role.\n\n{history}\n\nRead the above conversation. Then select the next role from {participants} to play. Only return the role.",
+    "allow_repeated_speaker": false,
+    "max_selector_attempts": 10
+  }
+}
