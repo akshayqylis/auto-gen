@@ -1,0 +1,237 @@
+{
+  "provider": "autogen_agentchat.teams.SelectorGroupChat",
+  "component_type": "team",
+  "version": 1,
+  "component_version": 1,
+  "description": "A team with 4 agents - a Web Surfer agent that can browse the web, a Verification Assistant that verifies and summarizes information, a Code Execution agent, and a User Proxy that provides human feedback when needed.",
+  "label": "Search Web and Execute",
+  "config": {
+    "participants": [
+      {
+        "provider": "autogen_ext.agents.web_surfer.MultimodalWebSurfer",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "MultimodalWebSurfer is a multimodal agent that acts as a web surfer that can search the web and visit web pages.",
+        "label": "MultimodalWebSurfer",
+        "config": {
+          "name": "websurfer_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Mistral",
+            "label": "Mistral",
+            "config": {
+              "model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+              "api_key": "EMPTY",
+              "model_info": {
+                "vision": true,
+                "function_calling": true,
+                "json_output": true,
+                "family": "unknown",
+                "structured_output": true
+              },
+              "base_url": "https://g3.ai.qylis.com/mistral/v1"
+            }
+          },
+          "description": "an agent that solves tasks by browsing the web",
+          "headless": true,
+          "start_page": "https://www.bing.com/",
+          "animate_actions": false,
+          "to_save_screenshots": false,
+          "use_ocr": false,
+          "to_resize_viewport": true
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.AssistantAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that provides assistance to other agents.",
+        "label": "AssistantAgent",
+        "config": {
+          "name": "assistant_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Mistral",
+            "label": "Mistral",
+            "config": {
+              "model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+              "api_key": "EMPTY",
+              "model_info": {
+                "vision": true,
+                "function_calling": true,
+                "json_output": true,
+                "family": "unknown",
+                "structured_output": true
+              },
+              "base_url": "https://g3.ai.qylis.com/mistral/v1"
+            }
+          },
+          "tools": [],
+          "model_context": {
+            "provider": "autogen_core.model_context.UnboundedChatCompletionContext",
+            "component_type": "chat_completion_context",
+            "version": 1,
+            "component_version": 1,
+            "description": "An unbounded chat completion context that keeps a view of the all the messages.",
+            "label": "UnboundedChatCompletionContext",
+            "config": {}
+          },
+          "description": "an agent that verifies and summarizes information",
+          "system_message": "You are a task verification assistant working with both a websurfer_agent and a code_execution_agent to ensure tasks are completed correctly.\n\nAt each point, check if the websurfer_agent has completed its search task and if the code_execution_agent has executed the code correctly. If either is incomplete, inform the agent what needs to be done and say \"keep going\". Only when both the web search and code execution tasks are fully completed and correct, provide a final summary of the results and then respond with TERMINATE.",
+          "model_client_stream": false,
+          "reflect_on_tool_use": false,
+          "tool_call_summary_format": "{result}"
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.UserProxyAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that can represent a human user through an input function.",
+        "label": "UserProxyAgent",
+        "config": {
+          "name": "user_proxy",
+          "description": "a human user that should be consulted only when the assistant_agent is unable to verify the information provided by the websurfer_agent"
+        }
+      },
+      {
+        "provider": "autogen_agentchat.agents.AssistantAgent",
+        "component_type": "agent",
+        "version": 1,
+        "component_version": 1,
+        "description": "An agent that provides assistance with executing code.",
+        "label": "AssistantAgent",
+        "config": {
+          "name": "code_executor_agent",
+          "model_client": {
+            "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+            "component_type": "model",
+            "version": 1,
+            "component_version": 1,
+            "description": "Mistral",
+            "label": "Mistral",
+            "config": {
+              "model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+              "api_key": "EMPTY",
+              "model_info": {
+                "vision": true,
+                "function_calling": true,
+                "json_output": true,
+                "family": "unknown",
+                "structured_output": true
+              },
+              "base_url": "https://g3.ai.qylis.com/mistral/v1"
+            }
+          },
+          "tools": [
+            {
+              "provider": "autogen_ext.tools.code_execution.PythonCodeExecutionTool",
+              "component_type": "tool",
+              "version": 1,
+              "component_version": 1,
+              "description": "A tool that executes Python code in a local environment.",
+              "label": "Python Code Execution Tool",
+              "config": {
+                "executor": {
+                  "provider": "autogen_ext.code_executors.local.LocalCommandLineCodeExecutor",
+                  "component_type": "code_executor",
+                  "version": 1,
+                  "component_version": 1,
+                  "description": "A code executor class that executes code through a local command line\n    environment.",
+                  "label": "LocalCommandLineCodeExecutor",
+                  "config": {
+                    "timeout": 360,
+                    "work_dir": ".coding",
+                    "functions_module": "functions"
+                  }
+                },
+                "description": "Execute Python code blocks.",
+                "name": "Python_Code_Execution_Tool"
+              }
+            }
+          ],
+          "model_context": {
+            "provider": "autogen_core.model_context.UnboundedChatCompletionContext",
+            "component_type": "chat_completion_context",
+            "version": 1,
+            "component_version": 1,
+            "description": "An unbounded chat completion context that keeps a view of the all the messages.",
+            "label": "UnboundedChatCompletionContext",
+            "config": {}
+          },
+          "description": "An agent that provides assistance with ability to use tools.",
+          "system_message": "You are a helpful assistant that executes code.",
+          "model_client_stream": false,
+          "reflect_on_tool_use": true,
+          "tool_call_summary_format": "{result}"
+        }
+      }
+    ],
+    "model_client": {
+      "provider": "autogen_ext.models.openai.OpenAIChatCompletionClient",
+      "component_type": "model",
+      "version": 1,
+      "component_version": 1,
+      "description": "Mistral",
+      "label": "Mistral",
+      "config": {
+        "model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+        "api_key": "EMPTY",
+        "model_info": {
+          "vision": true,
+          "function_calling": true,
+          "json_output": true,
+          "family": "unknown",
+          "structured_output": true
+        },
+        "base_url": "https://g3.ai.qylis.com/mistral/v1"
+      }
+    },
+    "termination_condition": {
+      "provider": "autogen_agentchat.base.OrTerminationCondition",
+      "component_type": "termination",
+      "version": 1,
+      "component_version": 1,
+      "label": "OrTerminationCondition",
+      "config": {
+        "conditions": [
+          {
+            "provider": "autogen_agentchat.conditions.MaxMessageTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation after a maximum number of messages have been exchanged.",
+            "label": "MaxMessageTermination",
+            "config": {
+              "max_messages": 100,
+              "include_agent_event": false
+            }
+          },
+          {
+            "provider": "autogen_agentchat.conditions.TextMentionTermination",
+            "component_type": "termination",
+            "version": 1,
+            "component_version": 1,
+            "description": "Terminate the conversation if a specific text is mentioned.",
+            "label": "TextMentionTermination",
+            "config": {
+              "text": "TERMINATE"
+            }
+          }
+        ]
+      }
+    },
+    "selector_prompt": "You are the coordinator of a role-playing game. The following roles are available:\n{roles}.\n\nGiven a task, the websurfer_agent is responsible for browsing the web to gather relevant information. It must use the browser to collect data and return only when necessary (e.g., for clarification or to pass along essential findings). If the websurfer_agent encounters code that should be executed, it forwards that code to the code_executor_agent.\n\nThe code_executor_agent is responsible for validating and executing code collected during the task. It ensures that the code is safe and relevant, and returns either output or error messages to be reviewed.\n\nThe assistant_agent is responsible for verifying and summarizing all information before it is presented to the user. This includes:\n\n    Reviewing and validating the accuracy and relevance of information returned by the websurfer_agent.\n\n    Reviewing the output or errors returned by the code_executor_agent, and providing feedback if the results are incorrect, incomplete, or require clarification.\n    Once all data is confirmed to be valid, the assistant_agent generates a clear, concise summary or next steps for the task. The conversation will always terminate after assistant_agent confirms the correctness and generates the summary.\n\nIf at any point user input or clarification is required (e.g., due to ambiguity, incomplete instructions, or user preferences), the user_proxy is selected to obtain and relay that information.\n\nRead the following conversation. Then select the next role from {participants} to play. Only return the role.\n\n{history}\n\nRead the above conversation. Then select the next role from {participants} to play. Only return the role.",
+    "allow_repeated_speaker": false,
+    "max_selector_attempts": 20
+  }
+}
